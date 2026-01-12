@@ -29,7 +29,7 @@ project/
 │   ├── menu.dsl           # Menu UI layout
 │   ├── game.dsl           # In-game UI layout
 │   └── ...
-├── ui_builder.py          # This script
+├── arcadeDSL.py          # This script
 └── main.py               # Your main game file
 ```
 
