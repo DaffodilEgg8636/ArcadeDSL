@@ -610,3 +610,33 @@ def UpdateVars(data: dict) -> None:
         setattr(ref["target_dict"], ref["target_key"], data[-2][ref["var_name"]])
 
 
+
+def InitializeUI(path: str="dsl", window: arcade.Window=None) -> dict:
+    """
+    Initialize the UI system with DSL files.
+    Returns a dictionary of UI objects by DSL file.
+    Args:
+        path (str): Path to DSL files folder
+        window (arcade.Window): Arcade window instance
+    """
+    # Load DSL files and dynamic variables
+    vars = LoadDDSLFiles(path)
+    raw_code = LoadDSLFiles(path)
+
+    UIScreens = {}
+    # Loop through each DSL file
+    for key, value in raw_code.items():
+        # Parse DSL code
+        ValidateDSLFiles(value)  # Ensure DSL syntax is correct
+        parsed_code, styles = ParseRaw(value, window.width, window.height)
+
+        # Link dynamic variables
+        LinkDynamicVars(parsed_code, vars)
+
+        # Create UI objects from parsed DSL
+        UIObjs = CreateUIObjs(tree=parsed_code, styles=styles)
+        UIScreens[key] = UIObjs
+
+    return UIScreens
+
+
