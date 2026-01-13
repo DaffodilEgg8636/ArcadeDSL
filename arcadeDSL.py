@@ -7,13 +7,90 @@ import json
 
 
 
-def interpret_ui(code: str, screen_width=800, screen_height=600) -> dict:
+sample_code = """
+    group(name="empty", anchor="center") {
+        label(
+            text="This DSL file is empty",
+            x=50%w, y=50%h
+        )
+    }"""
+
+
+
+def LoadDSLFiles(folder: str="dsl") -> dict:
+    """
+    Load all .dsl files from a folder into a dictionary.
+    Returns {filename: file_contents}
+    """
+    global sample_code
+    
+    raw_code = {}
+    folder = os.path.abspath(folder)  # absolute path
+
+    if not os.path.exists(folder):
+        raise FileNotFoundError(f"Folder not found: {folder}")
+
+    for filename in os.listdir(folder):
+        if filename.endswith(".dsl"):
+            key = os.path.splitext(filename)[0]  # remove extension
+            with open(os.path.join(folder, filename), "r", encoding="utf-8") as f:
+                value = f.read()
+            if value:
+                raw_code[key] = value
+            else:
+                raw_code[key] = sample_code
+
+    return raw_code
+
+
+
+def LoadDDSLFiles(folder: str="dsl") -> dict:
+    """
+    Load main.ddsl which contains the dynamic variables in JSON format.
+    Returns a dict of variable_name: value
+    """
+    with open(f"{folder}/main.ddsl", "r") as f:
+        vars = json.load(f)
+    return vars
+
+
+
+def ValidateDSLFiles(text: str) -> None:
+    """
+    Simple syntax check for balanced (), {}, []
+    Raises SyntaxError if unmatched
+    Args:
+        text (str): DSL code to validate
+    """
+    stack = []
+    for i, ch in enumerate(text):
+        if ch in "({[":
+            stack.append((ch, i))
+        elif ch in ")}]":
+            if not stack:
+                raise SyntaxError(f"Unmatched '{ch}' at position {i}")
+            opening, pos = stack.pop()
+            if (opening, ch) not in [("(", ")"), ("{", "}"), ("[", "]")]:
+                raise SyntaxError(f"Mismatched '{opening}' at {pos} and '{ch}' at {i}")
+
+    if stack:
+        raise SyntaxError(f"Unclosed '{stack[-1][0]}' at position {stack[-1][1]}")
+
+
+
+def ParseRaw(code: str=sample_code, screen_width: int=800, screen_height: int=600) -> tuple:
     """
     Parse DSL code with support for:
     - UI elements (buttons, labels, groups)
     - Percentages (%w/%h)
-    - Style() blocks with reusable named styles
-    Returns a nested dictionary tree.
+    - style() blocks with reusable named styles
+    Args:
+        code (str): DSL code to parse
+        screen_width (int): Screen width for percentage calculations
+        screen_height (int): Screen height for percentage calculations
+    Returns:
+        parsed_tree (dict): Parsed DSL tree
+        styles (dict): Named styles from DSL
     """
     code = re.sub(r"//.*", "", code).strip()  # remove line comments
     styles = {}  # global style storage
@@ -257,25 +334,57 @@ def interpret_ui(code: str, screen_width=800, screen_height=600) -> dict:
 
 
 
+def LinkDynamicVars(parsed_code: dict, variables: dict) -> None:
+    """
+    Link dynamic variables to DSL parsed code.
+    - Stores dynamic_vars in parsed_code
+    - Stores _dynamic_refs for future updates
+    Args:
+        parsed_code (dict): Parsed DSL tree
+        variables (dict): Dynamic variables (from .ddsl file)
+    """
+    parsed_code["dynamic_vars"] = variables
+    parsed_code["dynamic_refs"] = []
+
+    def iterate_dict(parsed_code, d, v_key, v_value, variables):
+        # Traverse nested dicts/lists
+        for key, value in list(d.items()):
+            if isinstance(value, dict):
+                iterate_dict(parsed_code, d[key], v_key, v_value, variables)
+            elif isinstance(value, list):
+                for i, item in enumerate(value):
+                    if isinstance(item, dict):
+                        iterate_dict(parsed_code, item, v_key, v_value, variables)
+            elif isinstance(value, str):
+                if "<<" in value and ">>" in value:
+                    var_name = value.replace("<<", "").replace(">>", "")
+                    if v_key == var_name:
+                        # Replace placeholder with actual variable value
+                        d[key] = variables[v_key]
+                        # Save reference for later dynamic updates
+                        parsed_code["dynamic_refs"].append({
+                            "target_dict": d,
+                            "target_key": key,
+                            "var_name": v_key
+                        })
+
+    # Iterate over all dynamic variables
+    for key, value in variables.items():
+        iterate_dict(parsed_code, parsed_code, key, value, variables)
 
 
 
-
-
-
-def build_ui_from_tree(tree: dict, obj_list: dict, styles=None, parent_props=None, dynamic_refs=None):
+def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root=None) -> dict:
     """
     Recursively create Arcade UI objects from a parsed DSL tree.
-
     Args:
-        tree (dict): Node from interpret_ui output (type, props, children)
-        obj_list (dict): Dictionary storing created objects; -1 key contains dynamic refs
+        tree (dict): Parsed DSL tree
         styles (dict): Named styles from DSL parsing
+    Args (recurrence):
         parent_props (dict): Inherited props from parent container
-        dynamic_refs (list): List of references to dynamic variables for updates
+        obj_list (list): List of created UI objects
+        root (dict): Root of the DSL tree (for dynamic vars)
     """
-    parent_props = parent_props or {}
-    styles = styles or {}
     # Start with inherited properties, then update with current node's props
     props = parent_props.copy()
     props.update(tree.get("props", {}))
@@ -284,6 +393,8 @@ def build_ui_from_tree(tree: dict, obj_list: dict, styles=None, parent_props=Non
     children = tree.get("children", [])
 
     created_obj = None  # store the actual Arcade UI object
+    if root is None:
+        root = tree
 
     # ---------- CREATE SPECIFIC UI ELEMENTS ----------
     if node_type == "label":
@@ -375,14 +486,7 @@ def build_ui_from_tree(tree: dict, obj_list: dict, styles=None, parent_props=Non
 
         # Default style if none provided
         else:
-            normal_style = arcade.gui.UIFlatButton.UIStyle(
-                #font_size=14,
-                #font_name=("Arial",),
-                #font_color=(255, 255, 255, 255),
-                #bg=(70, 70, 70, 255),
-                #border=(100, 100, 100, 255),
-                #border_width=2
-            )
+            normal_style = arcade.gui.UIFlatButton.UIStyle()
             button_kwargs["style"] = {state: normal_style for state in ["normal","hover","press","disabled"]}
 
         created_obj = arcade.gui.UIFlatButton(**button_kwargs)
@@ -476,13 +580,8 @@ def build_ui_from_tree(tree: dict, obj_list: dict, styles=None, parent_props=Non
         raise ValueError(f"Unknown UI element type: {node_type}")
 
     # ---------- DYNAMIC VARIABLE REFS ----------
-    try:
-        # Ensure obj_list[-1] contains dynamic references
-        temp = obj_list[-1]
-        del temp
-    except:
-        obj_list[-1] = dynamic_refs
-
+    obj_list[-1] = root["dynamic_refs"]
+    obj_list[-2] = root["dynamic_vars"]
     # Update dynamic reference to point to actual UI object
     for ref in obj_list[-1]:
         if ref["target_dict"] == tree["props"]:
@@ -490,112 +589,24 @@ def build_ui_from_tree(tree: dict, obj_list: dict, styles=None, parent_props=Non
 
     # Store created object in obj_list with name/tags
     if created_obj:
-        obj_list[len(obj_list)-1] = [created_obj, props.get("name", ""), props.get("tags", [])]
+        obj_list[len(obj_list)-2] = [created_obj, props.get("name", ""), props.get("tags", [])]
 
     # ---------- RECURSIVE CHILD CREATION ----------
     for child in children:
-        build_ui_from_tree(child, obj_list, styles, parent_props=props)
+        CreateUIObjs(tree=child, obj_list=obj_list, styles=styles, parent_props=props, root=root)
 
-    return created_obj
-
-
+    return obj_list
 
 
 
-
-def load_dsl_files(folder: str = "dsl") -> dict:
-    """
-    Scan folder for .dsl files, return {filename: file_content}
-    """
-    dsl_dict = {}
-    folder = os.path.abspath(folder)  # absolute path
-
-    if not os.path.exists(folder):
-        raise FileNotFoundError(f"Folder not found: {folder}")
-
-    for filename in os.listdir(folder):
-        if filename.endswith(".dsl"):
-            key = os.path.splitext(filename)[0]  # remove extension
-            file_path = os.path.join(folder, filename)
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            dsl_dict[key] = content
-
-    return dsl_dict
-
-
-def validate_dsl(text):
-    """
-    Simple syntax check for balanced (), {}, []
-    Raises SyntaxError if unmatched
-    """
-    stack = []
-    for i, ch in enumerate(text):
-        if ch in "({[":
-            stack.append((ch, i))
-        elif ch in ")}]":
-            if not stack:
-                raise SyntaxError(f"Unmatched '{ch}' at position {i}")
-            opening, pos = stack.pop()
-            if (opening, ch) not in [("(", ")"), ("{", "}"), ("[", "]")]:
-                raise SyntaxError(f"Mismatched '{opening}' at {pos} and '{ch}' at {i}")
-
-    if stack:
-        raise SyntaxError(f"Unclosed '{stack[-1][0]}' at position {stack[-1][1]}")
-
-
-def set_dsl_keys(parsed_code, variables:dict):
-    """
-    Link dynamic variables to DSL parsed tree.
-    - Stores dynamic_vars in parsed_code
-    - Stores _dynamic_refs for future updates
-    """
-    parsed_code["dynamic_vars"] = variables
-    parsed_code["_dynamic_refs"] = []
-
-    def iterate_dict(parsed_code, d, v_key, v_value, variables):
-        # Traverse nested dicts/lists
-        for key, value in list(d.items()):
-            if isinstance(value, dict):
-                iterate_dict(parsed_code, d[key], v_key, v_value, variables)
-            elif isinstance(value, list):
-                for i, item in enumerate(value):
-                    if isinstance(item, dict):
-                        iterate_dict(parsed_code, item, v_key, v_value, variables)
-            elif isinstance(value, str):
-                if "<<" in value and ">>" in value:
-                    var_name = value.replace("<<", "").replace(">>", "")
-                    if v_key == var_name:
-                        # Replace placeholder with actual variable value
-                        d[key] = variables[v_key]
-                        # Save reference for later dynamic updates
-                        parsed_code["_dynamic_refs"].append({
-                            "target_dict": d,
-                            "target_key": key,
-                            "var_name": v_key,
-                            "variables_ref": variables
-                        })
-
-    # Iterate over all dynamic variables
-    for key, value in variables.items():
-        iterate_dict(parsed_code, parsed_code, key, value, variables)
-    return parsed_code
-
-
-def update_ui(data):
+def UpdateVars(data: dict) -> None:
     """
     Updates all UI objects that have dynamic variables.
     Called every frame or when variables change.
+    Arguments:
+        data (dict): List of UI objects with dynamic references (only one screen)
     """
-    for i in data["DSLRaw"][data["currentUI"]][-1]:
-        setattr(i["target_dict"], i["target_key"], i["variables_ref"][i["var_name"]])
+    for ref in data[-1]:
+        setattr(ref["target_dict"], ref["target_key"], data[-2][ref["var_name"]])
 
 
-def load_ddsl_files(folder: str = "dsl") -> dict:
-    """
-    Load main.ddsl which contains the dynamic variables in JSON format.
-    Returns a dict of variable_name: value
-    """
-    with open(f"{folder}/main.ddsl", "r") as f:
-        json_data = json.load(f)
-    return json_data
