@@ -1,6 +1,6 @@
 # Arcade DSL UI Builder
 
-## This branch contains currently developped and not tested code. THIS README MIGHT NOT BE UP TO DATE
+## This branch contains code under development. THIS README MIGHT NOT BE UP TO DATE
 
 **Important**: This project is still under development and isn’t fully tested. I don’t recommend using this if you’re unexperienced. You will soon find a full documentation in this repository.
 
