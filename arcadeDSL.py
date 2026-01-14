@@ -22,8 +22,6 @@ def LoadDSLFiles(folder: str="dsl") -> dict:
     Load all .dsl files from a folder into a dictionary.
     Returns {filename: file_contents}
     """
-    global sample_code
-    
     raw_code = {}
     folder = os.path.abspath(folder)  # absolute path
 
@@ -360,7 +358,7 @@ def LinkDynamicVars(parsed_code: dict, variables: dict) -> None:
                     var_name = value.replace("<<", "").replace(">>", "")
                     if v_key == var_name:
                         # Replace placeholder with actual variable value
-                        d[key] = variables[v_key]
+                        d[key] = None
                         # Save reference for later dynamic updates
                         parsed_code["dynamic_refs"].append({
                             "target_dict": d,
@@ -374,7 +372,7 @@ def LinkDynamicVars(parsed_code: dict, variables: dict) -> None:
 
 
 
-def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root=None) -> dict:
+def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root=None, group_dynamic_refs=None) -> dict:
     """
     Recursively create Arcade UI objects from a parsed DSL tree.
     Args:
@@ -396,22 +394,25 @@ def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root
     if root is None:
         root = tree
 
+    if group_dynamic_refs is None:
+        group_dynamic_refs = []
+
     # ---------- CREATE SPECIFIC UI ELEMENTS ----------
     if node_type == "label":
         # Build a UILabel with all the provided properties
         label_kwargs = {
-            "text": props.get("text", ""),
-            "x": props.get("x", 0),
-            "y": props.get("y", 0),
-            "width": props.get("width", 0),
-            "height": props.get("height", 0),
-            "font_name": props.get("font_name", "Arial"),
-            "font_size": props.get("font_size", 14),
-            "text_color": props.get("text_color", (0,0,0,255)),
-            "bold": props.get("bold", False),
-            "italic": props.get("italic", False),
-            "align": props.get("anchor", "center"),
-            "multiline": props.get("multiline", False)
+            "text": props.get("text", "") or "Empty",
+            "x": props.get("x", 0) or 0,
+            "y": props.get("y", 0) or 0,
+            "width": props.get("width", 0) or 0,
+            "height": props.get("height", 0) or 0,
+            "font_name": props.get("font_name", "Arial") or "Arial",
+            "font_size": props.get("font_size", 14) or 14,
+            "text_color": props.get("text_color", (0,0,0,255)) or (0,0,0,255),
+            "bold": props.get("bold", False) or False,
+            "italic": props.get("italic", False) or False,
+            "align": props.get("anchor", "center") or "center",
+            "multiline": props.get("multiline", False) or False
         }
 
         # Center adjustment if anchor=center
@@ -425,11 +426,11 @@ def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root
     elif node_type == "button":
         # Build a UIFlatButton
         button_kwargs = {
-            "text": props.get("text", ""),
-            "x": props.get("x", 0),
-            "y": props.get("y", 0),
-            "width": props.get("width", 100),
-            "height": props.get("height", 100),
+            "text": props.get("text", "") or "Empty",
+            "x": props.get("x", 0) or 0,
+            "y": props.get("y", 0) or 0,
+            "width": props.get("width", 100) or 0,
+            "height": props.get("height", 100) or 0,
         }
 
         # Center adjustment
@@ -494,15 +495,15 @@ def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root
     elif node_type == "input_text":
         # Build a UIInputText
         input_text_kwargs = {
-            "text": props.get("text", ""),
-            "x": props.get("x", 0),
-            "y": props.get("y", 0),
-            "width": props.get("width", 200),
-            "height": props.get("height", 30),
-            "font_name": props.get("font_name", "Arial"),
-            "font_size": props.get("font_size", 14),
-            "text_color": props.get("text_color", (0, 0, 0, 255)),
-            "multiline": props.get("multiline", False)
+            "text": props.get("text", "") or "Empty",
+            "x": props.get("x", 0) or 0,
+            "y": props.get("y", 0) or 0,
+            "width": props.get("width", 200) or 0,
+            "height": props.get("height", 30) or 0,
+            "font_name": props.get("font_name", "Arial") or "Arial",
+            "font_size": props.get("font_size", 14) or 14,
+            "text_color": props.get("text_color", (0, 0, 0, 255)) or (0,0,0,255),
+            "multiline": props.get("multiline", False) or False
         }
 
         if "anchor" in props:
@@ -515,15 +516,15 @@ def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root
     elif node_type == "text_area":
         # Build a UITextArea
         text_area_kwargs = {
-            "text":props.get("text", ""),
-            "x":props.get("x", 0),
-            "y":props.get("y", 0),
-            "width":props.get("width", 300),
-            "height":props.get("height", 100),
-            "font_name":props.get("font_name", "Arial"),
-            "font_size":props.get("font_size", 12),
-            "text_color":props.get("text_color", (0, 0, 0, 255)),
-            "multiline":props.get("multiline", True),
+            "text": props.get("text", "") or "Empty",
+            "x": props.get("x", 0) or 0,
+            "y": props.get("y", 0) or 0,
+            "width": props.get("width", 200) or 0,
+            "height": props.get("height", 30) or 0,
+            "font_name": props.get("font_name", "Arial") or "Arial",
+            "font_size": props.get("font_size", 14) or 14,
+            "text_color": props.get("text_color", (0, 0, 0, 255)) or (0,0,0,255),
+            "multiline": props.get("multiline", False) or False,
             "scroll_speed":props.get("scroll_speed", 10.0)
         }
 
@@ -537,11 +538,11 @@ def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root
     elif node_type == "space":
         # Invisible spacing widget
         space_kwargs = {
-            "x":props.get("x", 0),
-            "y":props.get("y", 0),
-            "width":props.get("width", 100),
-            "height":props.get("height", 100),
-            "color":props.get("color", (0, 0, 0, 0))
+            "x":props.get("x", 0) or 0,
+            "y":props.get("y", 0) or 0,
+            "width":props.get("width", 100) or 0,
+            "height":props.get("height", 100) or 0,
+            "color":props.get("color", (0, 0, 0, 0)) or (0, 0, 0, 0)
         }
 
         if "anchor" in props:
@@ -554,11 +555,11 @@ def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root
     elif node_type == "dummy":
         # Placeholder/dummy widget
         dummy_kwargs = {
-            "x":props.get("x", 0),
-            "y":props.get("y", 0),
-            "width":props.get("width", 100),
-            "height":props.get("height", 100),
-            "color":props.get("color", (255, 0, 0))
+            "x":props.get("x", 0) or 0,
+            "y":props.get("y", 0) or 0,
+            "width":props.get("width", 100) or 0,
+            "height":props.get("height", 100) or 0,
+            "color":props.get("color", (0, 0, 0, 0)) or (0, 0, 0, 0)
         }
         created_obj = arcade.gui.UIDummy(**dummy_kwargs)
 
@@ -566,10 +567,10 @@ def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root
         # Sprite container widget
         sprite_widget_kwargs = {
             "sprite":props.get("sprite"),
-            "x":props.get("x", 0),
-            "y":props.get("y", 0),
-            "width":props.get("width", 64),
-            "height":props.get("height", 64)
+            "x":props.get("x", 0) or 0,
+            "y":props.get("y", 0) or 0,
+            "width":props.get("width", 64) or 0,
+            "height":props.get("height", 64) or 0
         }
         created_obj = arcade.gui.UISpriteWidget(**sprite_widget_kwargs)
 
@@ -579,21 +580,66 @@ def CreateUIObjs(tree: dict, styles: dict={}, parent_props={}, obj_list={}, root
     else:
         raise ValueError(f"Unknown UI element type: {node_type}")
 
-    # ---------- DYNAMIC VARIABLE REFS ----------
-    obj_list[-1] = root["dynamic_refs"]
-    obj_list[-2] = root["dynamic_vars"]
-    # Update dynamic reference to point to actual UI object
-    for ref in obj_list[-1]:
-        if ref["target_dict"] == tree["props"]:
-            ref["target_dict"] = created_obj
 
     # Store created object in obj_list with name/tags
     if created_obj:
         obj_list[len(obj_list)-2] = [created_obj, props.get("name", ""), props.get("tags", [])]
 
+    
+    # ---------- DYNAMIC VARIABLE REFS ----------
+    if root == tree:
+        obj_list[-1] = root["dynamic_refs"]
+        obj_list[-2] = root["dynamic_vars"]
+
+    # Update dynamic reference to point to actual UI object
+    for ref in obj_list[-1]:
+        if ref["target_dict"] == tree["props"]:
+            if node_type == "group":
+                temp = 0
+                for group_ref in group_dynamic_refs:
+                    if group_ref["target_key"] == ref["target_key"]:
+                        group_ref["var_name"] = ref["var_name"]
+                        temp = 1
+                if temp == 0:
+                    group_dynamic_refs.append({
+                        "target_dict": ref["target_dict"],
+                        "target_key": ref["target_key"],
+                        "var_name": ref["var_name"]
+                    })
+            else:
+                if ref["target_key"] == "name" or ref["target_key"] == "tags":
+                    ref["target_dict"] = obj_list[len(obj_list)-3]
+                else:
+                    ref["target_dict"] = created_obj
+
+    # Apply dynamic references to group children
+    if node_type != "group":
+        for i, ref in enumerate(group_dynamic_refs):
+            if not props.get(ref["target_key"], None):
+                if ref["target_key"] == "name" or ref["target_key"] == "tags":
+                    child_ref = {
+                        "target_dict": obj_list[len(obj_list)-3],
+                        "target_key": 1 if ref["target_key"] == "name" else 2,
+                        "var_name": ref["var_name"]
+                    }
+                    obj_list[-1].append(child_ref)
+                else:
+                    child_ref = {
+                        "target_dict": created_obj,
+                        "target_key": ref["target_key"],
+                        "var_name": ref["var_name"]
+                    }
+                    obj_list[-1].append(child_ref)
+
+    # After processing group and its children, remove group's own refs
+    if node_type == "group":
+        obj_list[-1] = [ref for ref in obj_list[-1] 
+                        if ref["target_dict"] != tree["props"]]
+                
+
     # ---------- RECURSIVE CHILD CREATION ----------
     for child in children:
-        CreateUIObjs(tree=child, obj_list=obj_list, styles=styles, parent_props=props, root=root)
+        CreateUIObjs(tree=child, obj_list=obj_list, styles=styles, parent_props=props, root=root, group_dynamic_refs=group_dynamic_refs)
 
     return obj_list
 
@@ -607,11 +653,14 @@ def UpdateVars(data: dict) -> None:
         data (dict): List of UI objects with dynamic references (only one screen)
     """
     for ref in data[-1]:
-        setattr(ref["target_dict"], ref["target_key"], data[-2][ref["var_name"]])
+        if isinstance(ref["target_dict"], dict) or isinstance(ref["target_dict"], list):
+            ref["target_dict"][ref["target_key"]] = data[-2][ref["var_name"]]
+        else:
+            setattr(ref["target_dict"], ref["target_key"], data[-2][ref["var_name"]])
 
 
 
-def InitializeUI(path: str="dsl", window: arcade.Window=None) -> dict:
+def InitializeUI(path: str="dsl", window=None) -> dict:
     """
     Initialize the UI system with DSL files.
     Returns a dictionary of UI objects by DSL file.
@@ -635,8 +684,11 @@ def InitializeUI(path: str="dsl", window: arcade.Window=None) -> dict:
 
         # Create UI objects from parsed DSL
         UIObjs = CreateUIObjs(tree=parsed_code, styles=styles)
+        UpdateVars(UIObjs)
         UIScreens[key] = UIObjs
 
     return UIScreens
+
+
 
 
