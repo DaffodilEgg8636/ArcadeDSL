@@ -32,7 +32,7 @@ style(name="primary_button") {
 
 
 group(name="all", anchor="center", bold=true) {
-    group(name="tab_switch", bold=true, y=96%h, height=8%h, width=32%w, style="button") {
+    group(name="<<Value1>>", bold=true, y=96%h, height=8%h, width=32%w, style="button") {
         button(
             text="<<Value1>>",
             x=16%w,
@@ -71,7 +71,7 @@ group(name="all", anchor="center", bold=true) {
         input_text(
             y=35%h,
             height=8%h
-        )
+        ),
         input_text(
             y=60%h,
             height=8%h
