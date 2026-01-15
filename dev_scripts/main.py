@@ -84,5 +84,7 @@ def LoadDSL(path: str = "dsl", resolution: tuple = (800, 600)) -> dict:
 window = arcade.Window(800, 600, "Arcade DSL Test")
 view = LauncherView()
 window.show_view(view)
-LoadDSL()
+UI = arcadeDSL.InitializeUI("dsl", window)
+with open("output.json", "w") as f:
+    f.write(str(UI))
 arcade.run()
