@@ -745,11 +745,64 @@ def InitializeUI(PATH: str="dsl", WINDOW: arcade.Window=arcade.Window(800, 600))
 
 
 
-def CreateManagers(UI_SCREENS: dict, WINDOW=None) -> dict:
+def CreateManagers(UI_SCREENS: dict, WINDOW, CLICK_HANDLER: callable) -> dict:
     """
     Create UI managers for each screen.
     Args:
-        UIScreens (dict): Dictionary of UI objects by DSL file
-        window (arcade.Window): Arcade window instance
+        UI_SCREENS (dict): Dictionary of UI objects by DSL file
+        WINDOW (arcade.Window): Arcade window instance
+    Returns:
+        dict: Dictionary of UI managers by DSL file
     """
-    return {}
+    if isinstance(WINDOW, arcade.Window):
+        try:
+            _managers = {} 
+            # Store a UIManager for each DSL UI screen
+            for key, _value in UI_SCREENS.items():
+                _managers[key] = arcade.gui.UIManager()
+                for obj_key, _obj_data in _value.items():
+                    if obj_key != -1: # Skip dynamic reference placeholder (-1)
+                        _managers[key].add(_obj_data[0]) # Add the UI element to the manager (0)
+                        if _obj_data[2] != []: # Assign tags and click handlers if tags exist
+                            _obj_data[0].tags = _obj_data[2]
+                            _obj_data[0].on_click = CLICK_HANDLER
+                        if _obj_data[1] != "": # Assign the object name if provided
+                            _obj_data[0].name = _obj_data[1]
+            return _managers
+        
+        except Exception:
+            traceback.print_exc()
+            return {}
+
+    else:
+        raise TypeError("An arcade window must be initialized before creating UI managers.")
+
+
+
+def SetCurrentScreen(MANAGERS: dict, CURRENT_SCREEN: str) -> str:
+    """
+    Enable only the currently active UI; disable others.
+    Args:
+        MANAGERS (dict): Dictionary of UI managers by DSL file
+        CURRENT_SCREEN (str): Name of the current screen
+    Returns:
+        str : Name of the current screen (can be different from the one provided due to NotFound errors)
+    """
+    try:
+        if CURRENT_SCREEN in MANAGERS:
+            for key, _value in MANAGERS.items():
+                if key != CURRENT_SCREEN:
+                    _value.disable()
+                else:
+                    _value.enable()
+            return CURRENT_SCREEN
+        else:
+            print(f"Screen not found: {CURRENT_SCREEN}")
+            if list(MANAGERS.keys())[0]:
+                return SetCurrentScreen(MANAGERS, MANAGERS.keys()[0])
+            else:
+                raise FileNotFoundError("No UI screens found.")
+
+    except Exception:
+        traceback.print_exc()
+        return ""
